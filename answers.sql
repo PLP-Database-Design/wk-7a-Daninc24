@@ -1,87 +1,87 @@
--- ### Question 1 Achieving 1NF (First Normal Form) 🛠️
-
-WITH
-  ProductDetail AS (
-    SELECT
-      101 AS OrderID,
-      'John Doe' AS CustomerName,
-      'Laptop, Mouse' AS Products
-    UNION ALL
-    SELECT
-      102,
-      'Jane Smith',
-      'Tablet, Keyboard, Mouse'
-    UNION ALL
-    SELECT
-      103,
-      'Emily Clark',
-      'Phone'
-  ),
-  -- Recursive CTE to split the Products string into individual products
-  RecursiveSplit AS (
-    SELECT
-      OrderID,
-      CustomerName,
-      Products,
-      1 AS position,
-      ',' AS delimiter,
-      Products || ',' AS full_string
-    FROM ProductDetail
-    UNION ALL
-    SELECT
-      OrderID,
-      CustomerName,
-      SUBSTR(
-        full_string,
-        1,
-        INSTR(full_string, delimiter) - 1
-      ),
-      position + 1,
-      delimiter,
-      SUBSTR(
-        full_string,
-        INSTR(full_string, delimiter) + 1
-      )
-    FROM RecursiveSplit
-    WHERE
-      INSTR(full_string, delimiter) > 0
-  )
-SELECT
-  OrderID,
-  CustomerName,
-  TRIM(ProductName) AS ProductName
-FROM
-  RecursiveSplit
-WHERE
-  LENGTH(TRIM(ProductName)) > 0;
 
 
+ --  Question 1
+CREATE TABLE ProductDetail (
+    OrderID INT,
+    CustomerName VARCHAR(100),
+    Products VARCHAR(100)
+);
+INSERT INTO ProductDetail(OrderID, CustomerName, Products)
+VALUES
+(101, 'John Doe', 'Laptop'),
+(101, 'John Doe', 'Mouse'),
+(102, 'Jane Smith', 'Tablet'),
+(102, 'Jane Smith', 'Keyboard'),
+(102, 'Jane Smith', 'Mouse'),
+(103, 'Emily Clark', 'Phone');
 
-  
--- ### Question 2 Achieving 2NF (Second Normal Form) 🧩
+-- - In the table above, the **Products column** contains multiple values, which violates **1NF**.
+-- - **Write an SQL query** to transform this table into **1NF**, ensuring that each row represents a single product for an order
+--  Question 1 - Solution
+-- Create a new table to store products in 1NF
+CREATE TABLE ProductDetail_1NF (
+    OrderID INT,
+    CustomerName VARCHAR(100),
+    Product VARCHAR(100)
+);
 
--- Create the Orders table
-CREATE TABLE Orders AS
-SELECT DISTINCT
-  OrderID,
-  CustomerName
-FROM OrderDetails;
-ALTER TABLE Orders ADD PRIMARY KEY (OrderID);
+-- Insert data into the 1NF table, splitting the Products column
+INSERT INTO ProductDetail_1NF (OrderID, CustomerName, Product)
+SELECT OrderID, CustomerName, value
+FROM ProductDetail
+CROSS APPLY STRING_SPLIT(Products, ',');
 
--- Create the OrderProducts table
-CREATE TABLE OrderProducts AS
-SELECT
-  OrderID,
-  Product,
-  Quantity
-FROM OrderDetails;
-ALTER TABLE OrderProducts ADD PRIMARY KEY (OrderID, Product);
-ALTER TABLE OrderProducts ADD FOREIGN KEY (OrderID) REFERENCES Orders(OrderID);
+-- Verify the transformed table
+SELECT * FROM ProductDetail_1NF;
 
--- Display the new tables
-SELECT
-  *
+
+-- Question 2
+CREATE TABLE Orders (
+    OrderID INT PRIMARY KEY,
+    CustomerName VARCHAR(100)
+);
+INSERT INTO Orders (OrderID, CustomerName)
+VALUES
+(101, 'John Doe'),
+(102, 'Jane Smith'),
+(103, 'Emily Clark');
+
+
+CREATE TABLE Product (
+    OrderID INT,
+    Product VARCHAR(100),
+    Quantity INT,
+    PRIMARY KEY (OrderID, Product),
+    FOREIGN KEY (OrderID) REFERENCES Orders(OrderID)
+);
+INSERT INTO Product (OrderID, Product, Quantity)
+VALUES
+(101, 'Laptop', 2),
+(101, 'Mouse', 1),
+(102, 'Tablet', 3),
+(102, 'Keyboard', 1),
+(102, 'Mouse', 2),
+(103, 'Phone', 1);
+-- - In the table above, the **CustomerName** column depends on **OrderID** (a partial dependency), which violates **2NF**. 
+
+-- - Write an SQL query to transform this table into **2NF** by removing partial dependencies. Ensure that each non-key column fully depends on the entire primary key.
+-- Question 2 - Solution
+-- Create a new table for customer information
+CREATE TABLE Customer (
+    OrderID INT PRIMARY KEY,
+    CustomerName VARCHAR(100)
+);
+
+-- Insert customer data
+INSERT INTO Customer (OrderID, CustomerName)
+SELECT OrderID, CustomerName
 FROM Orders;
-SELECT
-  *
-FROM OrderProducts;
+
+-- Modify the Product table to remove CustomerName
+ALTER TABLE Product
+DROP COLUMN CustomerName;
+
+-- Verify the transformed tables
+SELECT * FROM Customer;
+SELECT * FROM Product;
+
